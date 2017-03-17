@@ -60,7 +60,6 @@ class Peers {
             }
 
             // Log IP Address Access
-            $sql = "INSERT INTO `ip_activity` (`timestamp` ,`ip`, `attribute`) VALUES ";
             while($multiple >= 1)
             {
                 $this->db->query("INSERT INTO `ip_activity` (`timestamp` ,`ip`, `attribute`) VALUES (:time, :ip, :attribute)");
@@ -102,15 +101,26 @@ class Peers {
     }
     
     function modify_peer_grade($ip_address, $domain, $subfolder, $port_number, $grade)
-    {
-            $peer_failure = mysql_result(mysql_query("SELECT failed_sent_heartbeat FROM `active_peer_list` WHERE `IP_Address` = '$ip_address' AND `domain` = '$domain' AND `subfolder` = '$subfolder' AND `port_number` = $port_number LIMIT 1"),0,0);
+    {            
+            $this->db->query("SELECT failed_sent_heartbeat FROM `active_peer_list` WHERE `IP_Address` = :ip_address AND `domain` = :domain AND `subfolder` = :subfolder AND `port_number` = :port_number LIMIT 1");
+            $this->db->bind(':ip_address', $ip_address);
+            $this->db->bind(':domain', $domain);
+            $this->db->bind(':port_number', $port_number);
+            $this->db->bind(':subfolder', $subfolder);
+            $peer_failure = intval($this->db->singleValue()); 
 
             if($peer_failure < 50000) // Don't change anything over 50,000 as it is reserved for peers where failure grade is not used
             {
                     $peer_failure += $grade;
                     if($peer_failure >= 0)
                     {
-                            mysql_query("UPDATE `active_peer_list` SET `failed_sent_heartbeat` = $peer_failure WHERE `IP_Address` = '$ip_address' AND `domain` = '$domain' AND `subfolder` = '$subfolder' AND `port_number` = $port_number LIMIT 1");
+                            $this->db->query("UPDATE `active_peer_list` SET `failed_sent_heartbeat` = :peer_failure WHERE `IP_Address` = :ip_address AND `domain` = :domain AND `subfolder` = :subfolder AND `port_number` = :port_number LIMIT 1");
+                            $this->db->bind(':peer_failure', $peer_failure);
+                            $this->db->bind(':ip_address', $ip_address);
+                            $this->db->bind(':domain', $domain);
+                            $this->db->bind(':port_number', $port_number);
+                            $this->db->bind(':subfolder', $subfolder);
+                            $this->db->execute();
                     }
             }
             return;
@@ -171,8 +181,22 @@ class Peers {
     function peer_gen_amount($public_key)
     {
             // 1 week = 604,800 seconds
-            $join_peer_list1 = mysql_result(mysql_query("SELECT * FROM `generating_peer_list` WHERE `public_key` = '$public_key' LIMIT 2"),0,"join_peer_list");
-            $join_peer_list2 = mysql_result(mysql_query("SELECT * FROM `generating_peer_list` WHERE `public_key` = '$public_key' LIMIT 2"),1,"join_peer_list");	
+            $join_peer_list1 = "";
+            $join_peer_list2 = "";
+            $this->db->query("SELECT * FROM `generating_peer_list` WHERE `public_key` = :pub_key LIMIT 2");
+            $this->db->bind(':pub_key', $public_key);
+            $join_peer_list=$this->db->resultset();
+            
+            if($this->db->rowCount()>=1)
+            {
+                $join_peer_list1=$join_peer_list[0]["join_peer_list"];   
+            }            
+            if($this->db->rowCount()>=2)
+            {
+                $join_peer_list2=$join_peer_list[1]["join_peer_list"];
+            }            
+            
+            
             $amount;
 
             if(empty($join_peer_list1) == TRUE || $join_peer_list1 < TRANSACTION_EPOCH)
@@ -361,14 +385,16 @@ class Peers {
     function auto_update_IP_address()
     {
             // IPv4 Update
-            $generation_IP = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'generation_IP' LIMIT 1"),0,0);
+            $sys = new System();
+            
+            $generation_IP = $sys->get_option("generation_IP");
             $poll_IP = filter_sql(poll_peer(NULL, 'timekoin.net', NULL, 80, 46, "ipv4.php"));
-
+            
             if(empty($generation_IP) == TRUE) // IP Field Empty
             {
                     if(empty($poll_IP) == FALSE && ipv6_test($poll_IP) == FALSE)
-                    {
-                            if(mysql_query("UPDATE `options` SET `field_data` = '$poll_IP' WHERE `options`.`field_name` = 'generation_IP' LIMIT 1") == TRUE)
+                    {                            
+                            if($sys->set_option("generation_IP",$poll_IP) == TRUE)
                             {
                                     write_log("Generation IPv4 Updated to ($poll_IP)", "GP");
                             }
@@ -380,8 +406,8 @@ class Peers {
                     if($generation_IP != $poll_IP)
                     {
                             if(empty($poll_IP) == FALSE && ipv6_test($poll_IP) == FALSE)
-                            {
-                                    if(mysql_query("UPDATE `options` SET `field_data` = '$poll_IP' WHERE `options`.`field_name` = 'generation_IP' LIMIT 1") == TRUE)
+                            {                                    
+                                    if($sys->set_option("generation_IP",$poll_IP) == TRUE)
                                     {
                                             write_log("Generation IPv4 Updated from ($generation_IP) to ($poll_IP)", "GP");
                                     }
@@ -390,14 +416,14 @@ class Peers {
             }
 
             // IPv6 Update	
-            $generation_IP = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'generation_IP_v6' LIMIT 1"),0,0);
+            $generation_IP = $sys->get_option("generation_IP_v6");
             $poll_IP = filter_sql(poll_peer(NULL, 'ipv6.timekoin.net', NULL, 80, 46, "ipv6.php"));
 
             if(empty($generation_IP) == TRUE) // IP Field Empty
             {
                     if(empty($poll_IP) == FALSE && ipv6_test($poll_IP) == TRUE)
-                    {
-                            if(mysql_query("UPDATE `options` SET `field_data` = '$poll_IP' WHERE `options`.`field_name` = 'generation_IP_v6' LIMIT 1") == TRUE)
+                    {                            
+                            if($sys->set_option("generation_IP_v6",$poll_IP) == TRUE)
                             {
                                     write_log("Generation IPv6 Updated to ($poll_IP)", "GP");
                             }
@@ -410,7 +436,7 @@ class Peers {
                     {
                             if(empty($poll_IP) == FALSE && ipv6_test($poll_IP) == TRUE)
                             {
-                                    if(mysql_query("UPDATE `options` SET `field_data` = '$poll_IP' WHERE `options`.`field_name` = 'generation_IP_v6' LIMIT 1") == TRUE)
+                                    if($sys->set_option("generation_IP_v6",$poll_IP) == TRUE)
                                     {
                                             write_log("Generation IPv6 Updated from ($generation_IP) to ($poll_IP)", "GP");
                                     }
