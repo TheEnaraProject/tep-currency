@@ -8,15 +8,24 @@ class System {
     private $_Subfolder = "";
     private $_Port = "";
     private $_Domain = "";
+    private $db;
     
     public function __construct(){
-        
+        $this->db = new Database();       
+    }
+    
+    public function __construct1($database){
+        $this->db = $database;       
+    }
+    
+    public function __destruct() {
+       $this->db=null;
     }
     
     function my_public_key()
     {
         if ($this->_PublicKey == "")
-            $this->_PublicKey = mysql_result(mysql_query("SELECT field_data FROM `my_keys` WHERE `field_name` = 'server_public_key' LIMIT 1"),0,0);
+            $this->_PublicKey = $this->get_my_key("server_public_key");
         
         return $this->_PublicKey;
     }
@@ -24,7 +33,7 @@ class System {
     function my_private_key()
     {
         if ($this->_PrivateKey == "")
-            $this->_PrivateKey = mysql_result(mysql_query("SELECT field_data FROM `my_keys` WHERE `field_name` = 'server_private_key' LIMIT 1"),0,0);
+            $this->_PrivateKey = $this->get_my_key("server_private_key");
         
         return $this->_PrivateKey;
         
@@ -32,8 +41,8 @@ class System {
     
     function my_subfolder()
     {
-        if ($this->_Subfolder == "")
-            $this->_Subfolder = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'server_subfolder' LIMIT 1"),0,0);
+        if ($this->_Subfolder == "")            
+            $this->_Subfolder = $this->get_option("server_subfolder");
         
         return $this->_Subfolder;
     }
@@ -41,7 +50,7 @@ class System {
     function my_port_number()
     {
         if ($this->_Port == "")
-            $this->_Port = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'server_port_number' LIMIT 1"),0,0);
+            $this->_Port = $this->get_option("server_port_number");
         
         return $this->_Port;       
     }
@@ -49,7 +58,7 @@ class System {
     function my_domain()
     {
         if ($this->_Domain == "")
-            $this->_Domain = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'server_domain' LIMIT 1"),0,0);
+            $this->_Domain = $this->get_option("server_domain");
         
         return $this->_Domain;        
     }
@@ -59,7 +68,7 @@ class System {
             if($web_server_call == TRUE)
             {
                     // No Properly working PHP CLI Extensions for some odd reason, call from web server instead
-                    $cli_port = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'cli_port' LIMIT 1"),0,0);
+                    $cli_port = $this->get_option("cli_port"); 
 
                     if(empty($cli_port) == TRUE)
                     {
@@ -131,7 +140,7 @@ class System {
     function clone_script($script)
     {
             // No Properly working PHP CLI Extensions for some odd reason, call from web server instead
-            $cli_port = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'cli_port' LIMIT 1"),0,0);
+            $cli_port = $this->get_option("cli_port");
 
             if(empty($cli_port) == TRUE)
             {
@@ -158,114 +167,80 @@ class System {
             mysql_query("TRUNCATE TABLE `new_peers_list`");
 
             // Record when started
-            mysql_query("UPDATE `options` SET `field_data` = '" . time() . "' WHERE `options`.`field_name` = 'timekoin_start_time' LIMIT 1");
+            $this->set_option("timekoin_start_time", time());
     //**************************************
     // Upgrade Database from v3.x earlier versions
 
             // Auto IP Update Settings
-            $new_record_check = mysql_result(mysql_query("SELECT * FROM `options` WHERE `field_name` = 'auto_update_generation_IP' LIMIT 1"),0,0);
-            if($new_record_check === FALSE)
-            {
-                    // Does not exist, create it
-                    mysql_query("INSERT INTO `options` (`field_name` ,`field_data`) VALUES ('auto_update_generation_IP', '0')");
-            }
-
+            $this->set_option('auto_update_generation_IP','0');
+           
             // CLI Mode Settings
-            $new_record_check = mysql_result(mysql_query("SELECT * FROM `options` WHERE `field_name` = 'cli_mode' LIMIT 1"),0,0);
-            if($new_record_check === FALSE)
-            {
-                    // Does not exist, create it
-                    mysql_query("INSERT INTO `options` (`field_name` ,`field_data`) VALUES ('cli_mode', '1')");
-            }
-
+            $this->set_option('cli_mode','1');
+            
             // CLI Mode Port Settings
-            $new_record_check = mysql_result(mysql_query("SELECT * FROM `options` WHERE `field_name` = 'cli_port' LIMIT 1"),0,0);
-            if($new_record_check === FALSE)
-            {
-                    // Does not exist, create it
-                    mysql_query("INSERT INTO `options` (`field_name` ,`field_data`) VALUES ('cli_port', '')");
-            }
-
+            $this->set_option('cli_port','');
+            
             // IPv4 + IPv6 Network Mode
-            $new_record_check = mysql_result(mysql_query("SELECT * FROM `options` WHERE `field_name` = 'network_mode' LIMIT 1"),0,0);
-            if($new_record_check === FALSE)
-            {
-                    // Does not exist, create it
-                    mysql_query("INSERT INTO `options` (`field_name` ,`field_data`) VALUES ('network_mode', '1')");
-            }
-
+            $this->set_option('network_mode','1');
+            
             // IPv6 Generation IP Field
-            $new_record_check = mysql_result(mysql_query("SELECT * FROM `options` WHERE `field_name` = 'generation_IP_v6' LIMIT 1"),0,0);
-            if($new_record_check === FALSE)
-            {
-                    // Does not exist, create it
-                    mysql_query("INSERT INTO `options` (`field_name` ,`field_data`) VALUES ('generation_IP_v6', '')");
-            }
+            $this->set_option('generation_IP_v6','');
+            
     // Main Loop Status & Active Options Setup
 
             // Truncate to Free RAM
             mysql_query("TRUNCATE TABLE `main_loop_status`");
             $time = time();
     //**************************************
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('balance_last_heartbeat', '1')");	
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('foundation_last_heartbeat', '1')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('generation_last_heartbeat', '1')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('genpeer_last_heartbeat', '1')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('main_heartbeat_active', '0')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('main_last_heartbeat', '$time')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('peerlist_last_heartbeat', '1')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('queueclerk_last_heartbeat', '1')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('transclerk_last_heartbeat', '1')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('treasurer_last_heartbeat', '1')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('watchdog_heartbeat_active', '0')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('watchdog_last_heartbeat', '$time')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('peer_transaction_start_blocks', '1')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('peer_transaction_performance', '10')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('block_check_back', '1')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('block_check_start', '0')");	
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('firewall_blocked_peer', '0')");	
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('foundation_block_check', '0')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('foundation_block_check_end', '0')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('foundation_block_check_start', '0')");	
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('generation_peer_list_no_sync', '0')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('no_peer_activity', '0')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('time_sync_error', '0')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('transaction_history_block_check', '0')");
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('update_available', '0')");
+            $this->set_option('balance_last_heartbeat','1');
+            $this->set_option('foundation_last_heartbeat','1');
+            $this->set_option('generation_last_heartbeat','1');
+            $this->set_option('genpeer_last_heartbeat','1');
+            $this->set_option('main_heartbeat_active','0');
+            $this->set_option('main_last_heartbeat',$time);
+            $this->set_option('peerlist_last_heartbeat','1');
+            $this->set_option('queueclerk_last_heartbeat','1');
+            $this->set_option('transclerk_last_heartbeat','1');
+            $this->set_option('treasurer_last_heartbeat','1');
+            $this->set_option('watchdog_heartbeat_active','0');
+            $this->set_option('watchdog_last_heartbeat','$time');
+            $this->set_option('peer_transaction_start_blocks','1');
+            $this->set_option('peer_transaction_performance','10');
+            $this->set_option('block_check_back','1');
+            $this->set_option('block_check_start','0');
+            $this->set_option('firewall_blocked_peer','0');
+            $this->set_option('foundation_block_check','0');
+            $this->set_option('foundation_block_check_end','0');
+            $this->set_option('foundation_block_check_start','0');
+            $this->set_option('generation_peer_list_no_sync','0');
+            $this->set_option('no_peer_activity','0');
+            $this->set_option('time_sync_error','0');
+            $this->set_option('transaction_history_block_check','0');
+            $this->set_option('update_available','0');
+
     //**************************************
     // Copy values from Database to RAM Database
-            $db_to_RAM = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'allow_ambient_peer_restart' LIMIT 1"),0,0);
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('allow_ambient_peer_restart', '$db_to_RAM')");
+            $this->set_main_loop_status('allow_ambient_peer_restart', $this->get_option('allow_ambient_peer_restart'));
+            
+            $this->set_main_loop_status('allow_LAN_peers', $this->get_option('allow_LAN_peers'));
 
-            $db_to_RAM = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'allow_LAN_peers' LIMIT 1"),0,0);
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('allow_LAN_peers', '$db_to_RAM')");
+            $this->set_main_loop_status('server_request_max', $this->get_option('server_request_max'));
+            
+            $this->set_main_loop_status('max_active_peers', $this->get_option('max_active_peers'));
 
-            $db_to_RAM = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'server_request_max' LIMIT 1"),0,0);
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('server_request_max', '$db_to_RAM')");
+            $this->set_main_loop_status('max_new_peers', $this->get_option('max_new_peers'));
 
-            $db_to_RAM = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'max_active_peers' LIMIT 1"),0,0);
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('max_active_peers', '$db_to_RAM')");
+            $this->set_main_loop_status('trans_history_check', $this->get_option('trans_history_check'));
 
-            $db_to_RAM = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'max_new_peers' LIMIT 1"),0,0);
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('max_new_peers', '$db_to_RAM')");
+            $this->set_main_loop_status('super_peer', $this->get_option('super_peer'));
 
-            $db_to_RAM = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'trans_history_check' LIMIT 1"),0,0);
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('trans_history_check', '$db_to_RAM')");
+            $this->set_main_loop_status('perm_peer_priority', $this->get_option('perm_peer_priority'));
 
-            $db_to_RAM = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'super_peer' LIMIT 1"),0,0);
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('super_peer', '$db_to_RAM')");
+            $this->set_main_loop_status('auto_update_generation_IP', $this->get_option('auto_update_generation_IP'));
 
-            $db_to_RAM = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'perm_peer_priority' LIMIT 1"),0,0);
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('perm_peer_priority', '$db_to_RAM')");
+            $this->set_main_loop_status('peer_failure_grade', $this->get_option('peer_failure_grade'));
 
-            $db_to_RAM = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'auto_update_generation_IP' LIMIT 1"),0,0);
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('auto_update_generation_IP', '$db_to_RAM')");
-
-            $db_to_RAM = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'peer_failure_grade' LIMIT 1"),0,0);
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('peer_failure_grade', '$db_to_RAM')");
-
-            $db_to_RAM = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'network_mode' LIMIT 1"),0,0);
-            mysql_query("INSERT INTO `main_loop_status` (`field_name` ,`field_data`)VALUES ('network_mode', '$db_to_RAM')");	
+            $this->set_main_loop_status('network_mode', $this->get_option('network_mode'));
     //**************************************
             return 0;
     }
@@ -444,7 +419,7 @@ class System {
                             if(mysql_query($sql) == TRUE)
                             {
                                     // Blank reverse crypto data field
-                                    mysql_query("UPDATE `options` SET `field_data` = '' WHERE `options`.`field_name` = 'generation_key_crypt' LIMIT 1");
+                                    $this->db->set_options("generation_key_crypt", "");
 
                                     // Public Key Update Success				
                                     return 1;
@@ -1065,5 +1040,88 @@ class System {
 
             // Some other error
             return FALSE;
+    }
+    
+    function get_option($option_name)
+    {
+        $this->db->query("SELECT field_data FROM `options` WHERE `field_name` = :option_name LIMIT 1");
+        $this->db->bind(':option_name', $option_name);
+        return $this->db->singleValue();
+    }
+    
+    function set_option($option_name, $option_value)
+    {
+        if($this->db->option_exists($option_name))
+        {
+            $this->db->query("UPDATE `options` SET `field_data` = :option_value WHERE `options`.`field_name` = :option_name LIMIT 1");
+        }
+        else
+        {
+            $this->db->query("INSERT INTO `options` (`field_name`, `field_data`) VALUES( :option_name, :option_value) ");
+        }
+        
+        $this->db->bind(':option_name', $option_name);
+        $this->db->bind(':option_value', $option_value);
+        return $this->db->execute();
+    }
+    
+    function option_exists($option_name)
+    {
+        $this->db->query("SELECT field_data FROM `options` WHERE `field_name` = :option_name LIMIT 1");
+        $this->db->bind(':option_name', $option_name);
+        $this->db->execute();
+        $r = false;
+        
+        if($this->db->rowCount() > 0)
+        {
+            $r = true;
+        }        
+        
+        return $r;
+    }
+    
+    function get_main_loop_status($field_name)
+    {
+        $this->db->query("SELECT field_data FROM `main_loop_status` WHERE `field_name` = :field_name LIMIT 1");
+        $this->db->bind(':field_name', $field_name);
+        return $this->db->singleValue();
+    }
+    
+    function set_main_loop_status($field_name, $field_value)
+    {
+        if($this->db->main_loop_status_exists($field_name))
+        {
+            $this->db->query("UPDATE `main_loop_status` SET `field_data` = :field_value WHERE `options`.`field_name` = :field_name LIMIT 1");
+        }
+        else
+        {
+            $this->db->query("INSERT INTO `main_loop_status` (`field_name`, `field_data`) VALUES( :option_name, :option_value) ");
+        }
+        
+        $this->db->bind(':field_name', $field_name);
+        $this->db->bind(':field_value', $field_value);
+        return $this->db->execute();
+    }
+    
+    function main_loop_status_exists($field_name)
+    {
+        $this->db->query("SELECT field_data FROM `main_loop_status` WHERE `field_name` = :field_name LIMIT 1");
+        $this->db->bind(':field_name', field_name);
+        $this->db->execute();
+        $r = false;
+        
+        if($this->db->rowCount() > 0)
+        {
+            $r = true;
+        }        
+        
+        return $r;
+    }
+    
+    function get_my_key($field_name)
+    {
+        $this->db->query("SELECT field_data FROM `my_keys` WHERE `field_name` = :field_name LIMIT 1");
+        $this->db->bind(':field_name', $field_name);
+        return $this->db->singleValue();
     }
 }

@@ -6,6 +6,11 @@ set_time_limit(99);
 session_name("timekoin");
 session_start();
 
+
+$p = new Peers();
+$p->auto_update_IP_address();
+
+
 if($_SESSION["valid_login"] == FALSE && $_GET["action"] != "login")
 {
 	$db_connect = mysql_connect(MYSQL_IP,MYSQL_USERNAME,MYSQL_PASSWORD);
@@ -56,8 +61,9 @@ if($_SESSION["valid_session"] == TRUE && $_GET["action"] == "login")
 			exit ("Your IP Has Been Banned");
 		}
 
-		$username_hash = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'username' LIMIT 1"),0,0);
-		$password_hash = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'password' LIMIT 1"),0,0);
+                $s = new System();
+		$username_hash = $s->get_option("username") ;
+		$password_hash = $s->get_option("password") ;
 
 		if(hash('sha256', $http_username) == $username_hash)
 		{
@@ -108,7 +114,8 @@ if($_SESSION["valid_login"] == TRUE)
 	}
 //****************************************************************************
 // Global Variables
-	$user_timezone = mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'default_timezone' LIMIT 1"),0,0);
+        $s = new System();
+	$user_timezone = $s->get_option("default_timezone");
 //*********************************
 // Home Menu
 	if($_GET["menu"] == "home" || empty($_GET["menu"]) == TRUE)
@@ -121,7 +128,8 @@ if($_SESSION["valid_login"] == TRUE)
 		$script_loop_active = mysql_result(mysql_query("SELECT field_data FROM `main_loop_status` WHERE `field_name` = 'main_heartbeat_active' LIMIT 1"),0,0);
 		$script_last_heartbeat = mysql_result(mysql_query("SELECT field_data FROM `main_loop_status` WHERE `field_name` = 'main_last_heartbeat' LIMIT 1"),0,0);
 
-		$cli_mode = intval(mysql_result(mysql_query("SELECT field_data FROM `options` WHERE `field_name` = 'cli_mode' LIMIT 1"),0,0));
+                $s = new System();
+		$cli_mode = intval($s->get_option("cli_mode"));
 
 		if($cli_mode == 1)
 		{
@@ -562,7 +570,8 @@ if($_SESSION["valid_login"] == TRUE)
 
 		$quick_info = 'Check the Status of any Timekoin Server process.';
 
-		$home_update = mysql_result(mysql_query("SELECT * FROM `options` WHERE `field_name` = 'refresh_realtime_home' LIMIT 1"),0,"field_data");
+                $s = new System();
+		$home_update = $s->get_option("refresh_realtime_home");
 
 		home_screen("Realtime Server Status", $text_bar, $body_string, $quick_info , $home_update);
 		exit;
@@ -1048,7 +1057,8 @@ if($_SESSION["valid_login"] == TRUE)
 			<br><br><strong>Group Response</strong> is a sample average of all peers and how long it took the group to respond to a 10 second task.
 			<br>Less than 10 seconds increases peer speed by +1 and longer than 10 seconds decreases peer speed by -1.';
 
-			$peerlist_update = mysql_result(mysql_query("SELECT * FROM `options` WHERE `field_name` = 'refresh_realtime_peerlist' LIMIT 1"),0,"field_data");
+                        $s = new System();
+			$peerlist_update = $s->get_option("refresh_realtime_peerlist");
 
 			if($_GET["show"] == "reserve")
 			{
@@ -1066,29 +1076,31 @@ if($_SESSION["valid_login"] == TRUE)
 	{
 		if($_GET["server_settings"] == "change")
 		{
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["network_mode"] . "' WHERE `options`.`field_name` = 'network_mode' LIMIT 1");
+                        $s = new System();
+
+                        $s->set_option("network_mode", $option_value);
 			mysql_query("UPDATE `main_loop_status` SET `field_data` = '" . $_POST["network_mode"] . "' WHERE `main_loop_status`.`field_name` = 'network_mode' LIMIT 1");
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["max_peers"] . "' WHERE `options`.`field_name` = 'max_active_peers' LIMIT 1");
+                        $s->set_option("max_active_peers", $_POST["max_peers"]);
 			mysql_query("UPDATE `main_loop_status` SET `field_data` = '" . $_POST["max_peers"] . "' WHERE `main_loop_status`.`field_name` = 'max_active_peers' LIMIT 1");
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["max_new_peers"] . "' WHERE `options`.`field_name` = 'max_new_peers' LIMIT 1");
+                        $s->set_option("max_new_peers", $_POST["max_new_peers"]);
 			mysql_query("UPDATE `main_loop_status` SET `field_data` = '" . $_POST["max_new_peers"] . "' WHERE `main_loop_status`.`field_name` = 'max_new_peers' LIMIT 1");
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["cli_port"] . "' WHERE `options`.`field_name` = 'cli_port' LIMIT 1");
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["cli_mode"] . "' WHERE `options`.`field_name` = 'cli_mode' LIMIT 1");
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["domain"] . "' WHERE `options`.`field_name` = 'server_domain' LIMIT 1");
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["subfolder"] . "' WHERE `options`.`field_name` = 'server_subfolder' LIMIT 1");
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["max_request"] . "' WHERE `options`.`field_name` = 'server_request_max' LIMIT 1");
+                        $s->set_option("cli_port", $_POST["cli_port"]);
+                        $s->set_option("cli_mode", $_POST["cli_mode"]);
+                        $s->set_option("server_domain", $_POST["domain"]);
+                        $s->set_option("server_subfolder", $_POST["subfolder"]);
+                        $s->set_option("server_request_max", $_POST["max_request"]);
 			mysql_query("UPDATE `main_loop_status` SET `field_data` = '" . $_POST["max_request"] . "' WHERE `main_loop_status`.`field_name` = 'server_request_max' LIMIT 1");
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["allow_LAN"] . "' WHERE `options`.`field_name` = 'allow_LAN_peers' LIMIT 1");
+                        $s->set_option("allow_LAN_peers", $_POST["allow_LAN"]);
 			mysql_query("UPDATE `main_loop_status` SET `field_data` = '" . $_POST["allow_LAN"] . "' WHERE `main_loop_status`.`field_name` = 'allow_LAN_peers' LIMIT 1");
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["allow_ambient"] . "' WHERE `options`.`field_name` = 'allow_ambient_peer_restart' LIMIT 1");
+                        $s->set_option("allow_ambient_peer_restart", $_POST["allow_ambient"]);
 			mysql_query("UPDATE `main_loop_status` SET `field_data` = '" . $_POST["allow_ambient"] . "' WHERE `main_loop_status`.`field_name` = 'allow_ambient_peer_restart' LIMIT 1");
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["trans_history_check"] . "' WHERE `options`.`field_name` = 'trans_history_check' LIMIT 1");
+                        $s->set_option("trans_history_check", $_POST["trans_history_check"]);
 			mysql_query("UPDATE `main_loop_status` SET `field_data` = '" . $_POST["trans_history_check"] . "' WHERE `main_loop_status`.`field_name` = 'trans_history_check' LIMIT 1");
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["super_peer"] . "' WHERE `options`.`field_name` = 'super_peer' LIMIT 1");
+                        $s->set_option("super_peer", $_POST["super_peer"]);
 			mysql_query("UPDATE `main_loop_status` SET `field_data` = '" . $_POST["super_peer"] . "' WHERE `main_loop_status`.`field_name` = 'super_peer' LIMIT 1");
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["perm_peer_priority"] . "' WHERE `options`.`field_name` = 'perm_peer_priority' LIMIT 1");
+                        $s->set_option("perm_peer_priority", $_POST["perm_peer_priority"]);
 			mysql_query("UPDATE `main_loop_status` SET `field_data` = '" . $_POST["perm_peer_priority"] . "' WHERE `main_loop_status`.`field_name` = 'perm_peer_priority' LIMIT 1");			
-			mysql_query("UPDATE `options` SET `field_data` = '" . $_POST["auto_update_IP"] . "' WHERE `options`.`field_name` = 'auto_update_generation_IP' LIMIT 1");
+                        $s->set_option("auto_update_generation_IP", $_POST["auto_update_IP"]);
 			mysql_query("UPDATE `main_loop_status` SET `field_data` = '" . $_POST["auto_update_IP"] . "' WHERE `main_loop_status`.`field_name` = 'auto_update_generation_IP' LIMIT 1");			
 
 			if($_POST["port"] < 1 || $_POST["port"] > 65535)
@@ -1111,7 +1123,8 @@ if($_SESSION["valid_login"] == TRUE)
 				}
 			}			
 
-			mysql_query("UPDATE `options` SET `field_data` = '$port' WHERE `options`.`field_name` = 'server_port_number' LIMIT 1");
+                        $s->set_option("server_port_number", $port);
+
 			$server_code .= '<br><font color="blue"><strong>System Settings Updated...</strong></font><br><br>';
 		}
 
@@ -3385,7 +3398,8 @@ if($_SESSION["valid_login"] == TRUE)
 			if(mysql_query($sql) == TRUE)
 			{
 				// Blank reverse crypto data field
-				mysql_query("UPDATE `options` SET `field_data` = '' WHERE `options`.`field_name` = 'generation_key_crypt' LIMIT 1");				
+                                $s = new System();
+                                $s->set_option("generation_key_crypt", "");
 				
 				$server_message = '<br><font color="blue"><strong>Private Key Restore Complete!</strong></font><br><br>';
 			}
@@ -3402,7 +3416,8 @@ if($_SESSION["valid_login"] == TRUE)
 			if(mysql_query($sql) == TRUE)
 			{
 				// Blank reverse crypto data field
-				mysql_query("UPDATE `options` SET `field_data` = '' WHERE `options`.`field_name` = 'generation_key_crypt' LIMIT 1");
+                                $s = new System();
+                                $s->set_option("generation_key_crypt", "");
 
 				$server_message = '<br><font color="blue"><strong>Public Key Restore Complete!</strong></font><br><br>';
 			}
