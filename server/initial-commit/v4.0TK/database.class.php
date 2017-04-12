@@ -104,6 +104,13 @@ class Database{
 	public function cancelTransaction(){
 		return $this->dbh->rollBack();
 	}
+        
+        public function truncateTable($table_name)
+        {
+            $this->query("TRUNCATE TABLE " . $table_name);
+            return $this->execute();
+        }
+        
 	
 	// Debug function to return query parameters entered
 	public function debugDumpParams(){

@@ -3,8 +3,18 @@
 
 class Generation {
     
+    private $db;
+    
     public function __construct(){
-        
+        $this->db = new Database();       
+    }
+    
+    public function __construct1($database){
+        $this->db = $database;       
+    }
+    
+    public function __destruct() {
+       
     }
     
     function generation_peer_hash()

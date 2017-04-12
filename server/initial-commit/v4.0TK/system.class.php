@@ -19,7 +19,7 @@ class System {
     }
     
     public function __destruct() {
-       $this->db=null;
+       
     }
     
     function my_public_key()
@@ -159,12 +159,12 @@ class System {
     function initialization_database()
     {
             // Clear IP Activity and Banlist for next start
-            mysql_query("TRUNCATE TABLE `ip_activity`");
-            mysql_query("TRUNCATE TABLE `ip_banlist`");
+            $this->truncateTable("ip_activity");
+            $this->truncateTable("ip_banlist");
 
             // Clear Active & New Peers List
             mysql_query("DELETE FROM `active_peer_list` WHERE `active_peer_list`.`join_peer_list` != 0"); // Permanent Peers Ignored
-            mysql_query("TRUNCATE TABLE `new_peers_list`");
+            $this->truncateTable("new_peers_list");
 
             // Record when started
             $this->set_option("timekoin_start_time", time());
@@ -189,7 +189,7 @@ class System {
     // Main Loop Status & Active Options Setup
 
             // Truncate to Free RAM
-            mysql_query("TRUNCATE TABLE `main_loop_status`");
+            $this->truncateTable("main_loop_status");
             $time = time();
     //**************************************
             $this->set_option('balance_last_heartbeat','1');
@@ -761,7 +761,7 @@ class System {
             if(file_exists("../../pms_config.ini") == TRUE)
             {
                     //Previous port number
-                    $old_port = mysql_result(mysql_query("SELECT * FROM `options` WHERE `field_name` = 'server_port_number' LIMIT 1"),0,"field_data");
+                    $old_port = $this->get_option("server_port_number");
 
                     if($old_port != $new_port)// Don't change unless different than before
                     {
@@ -1049,9 +1049,25 @@ class System {
         return $this->db->singleValue();
     }
     
-    function set_option($option_name, $option_value)
+    //pass a wildcard in
+    function get_option_wildcard($option_name)
     {
-        if($this->db->option_exists($option_name))
+        $this->db->query("SELECT field_data FROM `options` WHERE `field_name` LIKE :option_name LIMIT 1");
+        $this->db->bind(':option_name', $option_name);
+        return $this->db->singleValue();
+    }
+       
+    
+    function get_option_list($option_name)
+    {
+        $this->db->query("SELECT field_data FROM `options` WHERE `field_name` = :option_name LIMIT 1");
+        $this->db->bind(':option_name', $option_name);
+        return $this->db->resultset();
+    }
+    
+    function set_option($option_name, $option_value, $allow_multiple=false)
+    {
+        if($this->option_exists($option_name) && !$allow_multiple)
         {
             $this->db->query("UPDATE `options` SET `field_data` = :option_value WHERE `options`.`field_name` = :option_name LIMIT 1");
         }
@@ -1062,6 +1078,21 @@ class System {
         
         $this->db->bind(':option_name', $option_name);
         $this->db->bind(':option_value', $option_value);
+        return $this->db->execute();
+    }
+    
+    function delete_option($option_name)
+    {
+        $this->db->query("DELETE FROM `options` WHERE `options`.`field_name` = :option_name");
+        $this->db->bind(':option_name', $option_name);
+        return $this->db->execute();
+    }
+    
+    //pass a wildcard in
+    function delete_option_wildcard($option_name)
+    {
+        $this->db->query("DELETE FROM `options` WHERE `options`.`field_name` LIKE :option_name");
+        $this->db->bind(':option_name', $option_name);
         return $this->db->execute();
     }
     
@@ -1080,6 +1111,34 @@ class System {
         return $r;
     }
     
+    function get_plugin($plugin)
+    {
+        $this->db->query("SELECT * FROM `options` WHERE `field_name` LIKE 'installed_plugins%' AND `field_data` LIKE ::plugin LIMIT 1");
+        $this->db->bind('::plugin', "%" . $plugin . "%");
+        return $this->db->singleValue();
+    }
+    
+    function get_plugin_list()
+    {
+        $this->db->query("SELECT * FROM `options` WHERE `field_name` LIKE 'installed_plugins%' ORDER BY `options`.`field_name` ASC");
+        return $this->db->resultset();
+    }
+    
+    function update_plugin($plugin, $value)
+    {
+        $this->db->query("UPDATE `options` SET `field_data` = ::value WHERE `options`.`field_name` LIKE 'installed_plugins%' AND `options`.`field_data` = ::plugin LIMIT 1");
+        $this->db->bind('::plugin', $plugin );
+        $this->db->bind('::value', $value);
+        return $this->db->singleValue();
+    }
+    
+    function delete_plugin($plugin)
+    {
+        $this->db->query("DELETE FROM `options` WHERE `options`.`field_name` LIKE 'installed_plugins%' AND `options`.`field_data` = ::plugin LIMIT 1");
+        $this->db->bind('::plugin', $plugin);
+        return $this->db->execute();
+    }
+    
     function get_main_loop_status($field_name)
     {
         $this->db->query("SELECT field_data FROM `main_loop_status` WHERE `field_name` = :field_name LIMIT 1");
@@ -1089,17 +1148,24 @@ class System {
     
     function set_main_loop_status($field_name, $field_value)
     {
-        if($this->db->main_loop_status_exists($field_name))
+        if($this->main_loop_status_exists($field_name))
         {
-            $this->db->query("UPDATE `main_loop_status` SET `field_data` = :field_value WHERE `options`.`field_name` = :field_name LIMIT 1");
+            $this->db->query("UPDATE `main_loop_status` SET `field_data` = :field_value WHERE `main_loop_status`.`field_name` = :field_name LIMIT 1");
         }
         else
         {
-            $this->db->query("INSERT INTO `main_loop_status` (`field_name`, `field_data`) VALUES( :option_name, :option_value) ");
+            $this->db->query("INSERT INTO `main_loop_status` (`field_name`, `field_data`) VALUES( :field_name, :field_value) ");
         }
         
         $this->db->bind(':field_name', $field_name);
         $this->db->bind(':field_value', $field_value);
+        return $this->db->execute();
+    }
+    
+    function delete_main_loop_status($field_name)
+    {
+        $this->db->query("DELETE FROM `main_loop_status` WHERE `main_loop_status`.`field_name` = :field_name");
+        $this->db->bind(':field_name', $field_name);
         return $this->db->execute();
     }
     
@@ -1118,10 +1184,15 @@ class System {
         return $r;
     }
     
-    function get_my_key($field_name)
+    function truncateTable($table_name)
+    {
+        return $this->db->truncateTable($table_name);
+    }
+    
+    function get_my_key($key_name)
     {
         $this->db->query("SELECT field_data FROM `my_keys` WHERE `field_name` = :field_name LIMIT 1");
-        $this->db->bind(':field_name', $field_name);
+        $this->db->bind(':field_name', $key_name);
         return $this->db->singleValue();
     }
 }

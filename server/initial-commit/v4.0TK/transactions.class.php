@@ -3,8 +3,18 @@
 
 class Transactions {
     
+    private $db;
+    
     public function __construct(){
-        
+        $this->db = new Database();       
+    }
+    
+    public function __construct1($database){
+        $this->db = $database;       
+    }
+    
+    public function __destruct() {
+       
     }
     
     function transaction_cycle($past_or_future = 0, $transacton_cycles_only = 0)
