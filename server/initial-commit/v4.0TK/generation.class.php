@@ -14,7 +14,7 @@ class Generation {
     }
     
     public function __destruct() {
-       
+       $this->db=null;
     }
     
     function generation_peer_hash()
@@ -416,4 +416,37 @@ class Generation {
             // No Matching Key with an IPv6 Address Found
             return;
     }
+    
+    function get_generating_peer_by_ip($ip)
+    {
+        $this->db->query("SELECT * FROM `generating_peer_list` WHERE `IP_Address` = :ip LIMIT 1");
+        $this->db->bind(':ip', $ip);
+        return $this->db->singleRow();
+    }
+    
+    function get_generating_peer_by_key($pubKey)
+    {
+        $this->db->query("SELECT * FROM `generating_peer_list` WHERE `public_key` = :pubKey LIMIT 1");
+        $this->db->bind(':pubKey', $pubKey);
+        return $this->db->singleRow();
+    }
+    
+    function get_generating_peers_ordered_by_join_time()
+    {
+        $this->db->query("SELECT * FROM `generating_peer_list` ORDER BY `join_peer_list` ASC");        
+        return $this->db->resultset();
+    }
+    
+    function get_generating_peers_at_least_24_hours()
+    {
+        $this->db->query("SELECT * FROM `generating_peer_list` WHERE `join_peer_list` < " . (time() - 86400) . "");        
+        return $this->db->resultset();
+    }
+    
+    function get_generating_queue_ordered_by_timestamp()
+    {
+        $this->db->query("SELECT * FROM `generating_peer_queue` ORDER BY `timestamp` ASC");        
+        return $this->db->resultset();
+    }
+    
 }

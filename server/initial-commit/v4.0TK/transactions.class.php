@@ -14,7 +14,7 @@ class Transactions {
     }
     
     public function __destruct() {
-       
+       $this->db=null;
     }
     
     function transaction_cycle($past_or_future = 0, $transacton_cycles_only = 0)

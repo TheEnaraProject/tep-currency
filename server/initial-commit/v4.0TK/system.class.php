@@ -19,7 +19,7 @@ class System {
     }
     
     public function __destruct() {
-       
+       $this->db=null;
     }
     
     function my_public_key()
@@ -1080,7 +1080,7 @@ class System {
         $this->db->bind(':option_value', $option_value);
         return $this->db->execute();
     }
-    
+                    
     function delete_option($option_name)
     {
         $this->db->query("DELETE FROM `options` WHERE `options`.`field_name` = :option_name");

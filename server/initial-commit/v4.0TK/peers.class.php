@@ -441,6 +441,65 @@ class Peers {
 
             return FALSE;
     }
-
+    
+    function insert_active_peer($ip, $domain, $subfolder, $port, $lastHeartbeat, $joinPeerlist, $failedSentHearbeat)
+    {
+        $this->db->query("INSERT INTO `active_peer_list` (`IP_Address` ,`domain` ,`subfolder` ,`port_number` ,`last_heartbeat` ,`join_peer_list` ,`failed_sent_heartbeat`)
+				VALUES (:ip, :domain, :subfolder, :port, :lastheartbeat , :joinpeerlist , :failedsentheartbeat)");
+        $this->db->bind(':ip', $ip);
+        $this->db->bind(':domain', $domain);
+        $this->db->bind(':subfolder', $subfolder);
+        $this->db->bind(':port', $port);
+        $this->db->bind(':lastheartbeat', $lastHeartbeat);
+        $this->db->bind(':joinpeerlist', $joinPeerlist);
+        $this->db->bind(':failedsentheartbeat', $failedSentHearbeat);
+        return $this->db->execute();
+    }
+    
+    function update_active_peer($oldIp, $oldDomain, $ip, $domain, $subfolder, $port, $lastHeartbeat, $joinPeerlist, $failedSentHearbeat)
+    {
+        $this->db->query("UPDATE `active_peer_list` SET `last_heartbeat` = :lastheartbeat ,`join_peer_list` = :joinpeerlist , `failed_sent_heartbeat` = :failedsentheartbeat,
+				`IP_Address` = :ip, `domain` = :domain, `subfolder` = :subfolder, `port_number` = :port
+				WHERE `active_peer_list`.`IP_Address` = :oldip AND `active_peer_list`.`domain` = :olddomain LIMIT 1");
+        $this->db->bind(':oldip', $oldIp);
+        $this->db->bind(':olddomain', $oldDomain);
+        $this->db->bind(':ip', $ip);
+        $this->db->bind(':domain', $domain);
+        $this->db->bind(':subfolder', $subfolder);
+        $this->db->bind(':port', $port);
+        $this->db->bind(':lastheartbeat', $lastHeartbeat);
+        $this->db->bind(':joinpeerlist', $joinPeerlist);
+        $this->db->bind(':failedsentheartbeat', $failedSentHearbeat);
+        return $this->db->execute();
+    }
+    
+    function delete_active_peer($ip, $domain)
+    {
+        $this->db->query("DELETE FROM `active_peer_list` WHERE `active_peer_list`.`IP_Address` = :ip AND `active_peer_list`.`domain` = :domain LIMIT 1");
+        $this->db->bind(':ip', $ip);
+        $this->db->bind(':domain', $domain);
+        return $this->db->execute();
+    }
+    
+    function get_active_peers()
+    {
+        $this->db->query("SELECT * FROM `active_peer_list`");        
+        return $this->db->resultset();
+    }
+    
+    function get_active_peer($ip, $domain)
+    {
+        $this->db->query("SELECT * FROM `active_peer_list` WHERE `IP_Address` = :ip AND `domain` = :domain LIMIT 1");
+        $this->db->bind(':ip', $ip);
+        $this->db->bind(':domain', $domain);
+        return $this->db->singleRow();
+    }
+    
+    function get_new_peers()
+    {
+        $this->db->query("SELECT * FROM `new_peers_list`");        
+        return $this->db->resultset();
+    }
+    
     
 }

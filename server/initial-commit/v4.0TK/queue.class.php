@@ -14,7 +14,7 @@ class Queue {
     }
     
     public function __destruct() {
-       
+       $this->db=null;
     }
     
     function queue_hash()

@@ -14,7 +14,7 @@ class TransactionHistory {
     }
     
     public function __destruct() {
-       
+       $this->db=null;
     }
     
     function transaction_history_hash()
