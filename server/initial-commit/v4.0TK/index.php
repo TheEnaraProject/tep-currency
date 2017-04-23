@@ -495,9 +495,6 @@ if($_SESSION["valid_login"] == TRUE)
 		}
 
 		// Check for Plugin Services Active
-		//$sql = "SELECT * FROM `options` WHERE `field_name` LIKE 'installed_plugins%' ORDER BY `options`.`field_name` ASC";
-		//$sql_result = mysql_query($sql);
-		//$sql_num_results = mysql_num_rows($sql_result);
                 
                 $plugins = $s->get_plugin_list();
                 $pluginCount = count($firstContactServers)-1;
@@ -580,11 +577,12 @@ if($_SESSION["valid_login"] == TRUE)
 	if($_GET["menu"] == "peerlist")
 	{
             $s = new System();
+            $p = new Peers();
+            $g = new Generation();
 		if($_GET["remove"] == "peer")
 		{
 			// Manually remove this peer
-			$sql = "DELETE FROM `active_peer_list` WHERE `active_peer_list`.`IP_Address` = '" . $_POST["ip"] . "' AND `active_peer_list`.`domain` = '" . $_POST["domain"] . "' LIMIT 1";
-			mysql_query($sql);
+                        $p->delete_active_peer($_POST["ip"], $_POST["domain"]);
 		}
 
 		if($_GET["save"] == "peer" && empty($_POST["edit_port"]) == FALSE)
@@ -599,18 +597,13 @@ if($_SESSION["valid_login"] == TRUE)
 				$join_peer_list = time();
 			}
 			
-			$sql = "UPDATE `active_peer_list` SET `last_heartbeat` = " . time() . " ,`join_peer_list` = $join_peer_list , `failed_sent_heartbeat` = '0',
-				`IP_Address` = '" . $_POST["edit_ip"] . "', `domain` = '" . $_POST["edit_domain"] . "', `subfolder` = '" . $_POST["edit_subfolder"] . "', `port_number` = '" . $_POST["edit_port"] . "'
-				WHERE `active_peer_list`.`IP_Address` = '" . $_POST["update_ip"] . "' AND `active_peer_list`.`domain` = '" . $_POST["update_domain"] . "' LIMIT 1";
-			mysql_query($sql);
+                        $p->update_active_peer($_POST["update_ip"], $_POST["update_domain"], $_POST["edit_ip"], $_POST["edit_domain"], $_POST["edit_subfolder"], $_POST["edit_port"], time(), $join_peer_list, "0");
 		}
 
 		if($_GET["save"] == "newpeer" && empty($_POST["edit_port"]) == FALSE)
 		{
 			// Manually insert new peer
-			$sql = "INSERT INTO `active_peer_list` (`IP_Address` ,`domain` ,`subfolder` ,`port_number` ,`last_heartbeat` ,`join_peer_list` ,`failed_sent_heartbeat`)
-				VALUES ('" . $_POST["edit_ip"] . "', '" . $_POST["edit_domain"] . "', '" . $_POST["edit_subfolder"] . "', '" . $_POST["edit_port"] . "', " . time() . " , " . time() . " , '0')";
-			mysql_query($sql);
+                        $p->insert_active_peer($_POST["edit_ip"], $_POST["edit_domain"], $_POST["edit_subfolder"], $_POST["edit_port"], time(), time(), "0");
 
 			ini_set('user_agent', 'Timekoin Server (GUI) v' . TIMEKOIN_VERSION);
 			ini_set('default_socket_timeout', 3); // Timeout for request in seconds
@@ -651,21 +644,18 @@ if($_SESSION["valid_login"] == TRUE)
 			$body_string = '<div class="table"><table class="listing" border="0" cellspacing="0" cellpadding="0" >
 				<tr><th>Peer</th><th>Time</th><th>Variance</th><th>Ping</th></tr>';
 
-			// Polling what the active peers have
-			$sql = "SELECT * FROM `active_peer_list`";
-			$sql_result = mysql_query($sql);
-			$sql_num_results = mysql_num_rows($sql_result);
+			// Polling what the active peers have                        
 			$response_counter = 0;
 			$variance_total = 0;
+                        $activePeers = $p->get_active_peers();
 
-			for ($i = 0; $i < $sql_num_results; $i++)
+			foreach ($activePeers as $peer)
 			{
-				$sql_row = mysql_fetch_array($sql_result);
 				
-				$ip_address = $sql_row["IP_Address"];
-				$domain = $sql_row["domain"];
-				$subfolder = $sql_row["subfolder"];
-				$port_number = $sql_row["port_number"];
+				$ip_address = $peer["IP_Address"];
+				$domain = $peer["domain"];
+				$subfolder = $peer["subfolder"];
+				$port_number = $peer["port_number"];
 
 				$my_micro_time = microtime(TRUE);				
 
@@ -757,18 +747,15 @@ if($_SESSION["valid_login"] == TRUE)
 			$my_port = my_port_number();
 
 			// Polling what the active peers have
-			$sql = "SELECT * FROM `active_peer_list`";
-			$sql_result = mysql_query($sql);
-			$sql_num_results = mysql_num_rows($sql_result);
+			$activePeers = $p->get_active_peers();
 
-			for ($i = 0; $i < $sql_num_results; $i++)
+			foreach ($activePeers as $peer)
 			{
-				$sql_row = mysql_fetch_array($sql_result);
-				
-				$ip_address = $sql_row["IP_Address"];
-				$domain = $sql_row["domain"];
-				$subfolder = $sql_row["subfolder"];
-				$port_number = $sql_row["port_number"];
+								
+				$ip_address = $peer["IP_Address"];
+				$domain = $peer["domain"];
+				$subfolder = $peer["subfolder"];
+				$port_number = $peer["port_number"];
 
 				// Poll and give my domain to check against
 				$poll_peer = poll_peer($ip_address, $domain, $subfolder, $port_number, 5, "peerlist.php?action=poll_failure&domain=$my_domain&subfolder=$my_subfolder&port=$my_port");
@@ -812,9 +799,6 @@ if($_SESSION["valid_login"] == TRUE)
 			}
 			else if($_GET["type"] == "firstcontact")
 			{
-		//		$sql = "SELECT *  FROM `options` WHERE `field_name` = 'first_contact_server'";
-		//		$sql_result = mysql_query($sql);
-		//		$sql_num_results = mysql_num_rows($sql_result) + 2;
 				$counter = 1;                                
 				$body_string .= '<FORM ACTION="index.php?menu=peerlist&amp;save=firstcontact" METHOD="post">
 					<div class="table"><table class="listing" border="0" cellspacing="0" cellpadding="0"><tr><th>IP Address</th>
@@ -847,11 +831,9 @@ if($_SESSION["valid_login"] == TRUE)
 			else
 			{
 				// Manually edit this peer
-				$sql = "SELECT * FROM `active_peer_list` WHERE `IP_Address` = '" . $_POST["ip"] ."' AND `domain` = '" . $_POST["domain"] ."' LIMIT 1";
-				$sql_result = mysql_query($sql);
-				$sql_row = mysql_fetch_array($sql_result);
+				$peer = $p->get_active_peer($_POST["ip"], $_POST["domain"]);
 
-				if($sql_row["join_peer_list"] == 0)
+				if($peer["join_peer_list"] == 0)
 				{
 					$perm_peer1 = "SELECTED";
 				}
@@ -863,22 +845,20 @@ if($_SESSION["valid_login"] == TRUE)
 				$body_string .= '<FORM ACTION="index.php?menu=peerlist&amp;save=peer" METHOD="post">
 				<table class="listing" border="0" cellspacing="0" cellpadding="0"><tr><th>IP Address</th>
 				<th>Domain</th><th>Subfolder</th><th>Port Number</th><th></th><th></th></tr>
-				<tr><td class="style2"><input type="text" name="edit_ip" size="30" value="' . $sql_row["IP_Address"] . '" /><br><br>
+				<tr><td class="style2"><input type="text" name="edit_ip" size="30" value="' . $peer["IP_Address"] . '" /><br><br>
 				<select name="perm_peer"><option value="expires" ' . $perm_peer2 . '>Purge When Inactive</option><option value="perm" ' . $perm_peer1 . '>Permanent Peer</select></td>
-				<td class="style2" valign="top"><input type="text" name="edit_domain" size="20" value="' . $sql_row["domain"] . '" /></td>
-				<td class="style2" valign="top"><input type="text" name="edit_subfolder" size="8" value="' . $sql_row["subfolder"] . '" /></td>
-				<td class="style2" valign="top"><input type="text" name="edit_port" size="5" value="' . $sql_row["port_number"] . '" /></td>			 
-				<td valign="top"><input type="hidden" name="update_ip" value="' . $sql_row["IP_Address"] . '">
-				<input type="hidden" name="update_domain" value="' . $sql_row["domain"] . '">
+				<td class="style2" valign="top"><input type="text" name="edit_domain" size="20" value="' . $peer["domain"] . '" /></td>
+				<td class="style2" valign="top"><input type="text" name="edit_subfolder" size="8" value="' . $peer["subfolder"] . '" /></td>
+				<td class="style2" valign="top"><input type="text" name="edit_port" size="5" value="' . $peer["port_number"] . '" /></td>			 
+				<td valign="top"><input type="hidden" name="update_ip" value="' . $peer["IP_Address"] . '">
+				<input type="hidden" name="update_domain" value="' . $peer["domain"] . '">
 				<input type="image" src="img/save-icon.gif" title="Save Settings" name="submit1" border="0"></td>
 				<td valign="top"></td></tr></table></FORM>';
 			}
 
-			$sql = "SELECT * FROM `active_peer_list`";
-			$active_peers = mysql_num_rows(mysql_query($sql));
+			$active_peers = count($p->get_active_peers());
 
-			$sql = "SELECT * FROM `new_peers_list`";
-			$new_peers = mysql_num_rows(mysql_query($sql));
+			$new_peers = count($p->get_new_peers());
 
 			$peer_number_bar = '<strong>Active Peers: <font color="green">' . $active_peers . '</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Peers in Reserve: <font color="blue">' . $new_peers . '</font></strong>';
 
@@ -899,28 +879,27 @@ if($_SESSION["valid_login"] == TRUE)
 			<th><p style="font-size:11px; width:55px;">Joined</p></th>
 			<th><p style="font-size:11px; width:50px; text-align:center;">Failure Score</p></th><th></th><th></th></tr>';			
 			
+                        $peers = "";
+                        
 			if($_GET["show"] == "reserve")
 			{
-				$sql = "SELECT * FROM `new_peers_list`";
+				$peers = $p->get_new_peers();
 			}
 			else
 			{
-				$sql = "SELECT * FROM `active_peer_list`";
+				$peers = $p->get_active_peers();
 			}
 
-			$sql_result = mysql_query($sql);
-			$sql_num_results = mysql_num_rows($sql_result);
-
-			for ($i = 0; $i < $sql_num_results; $i++)
+			foreach ($peers as $peer)
 			{
 				$sql_row = mysql_fetch_array($sql_result);
 
 				if($_GET["show"] != "reserve")
 				{
-					$last_heartbeat = time() - $sql_row["last_heartbeat"];
+					$last_heartbeat = time() - $peer["last_heartbeat"];
 					$last_heartbeat = tk_time_convert($last_heartbeat);
 
-					if($sql_row["join_peer_list"] == 0)
+					if($peer["join_peer_list"] == 0)
 					{
 						$joined = 'P';
 						$permanent1 = '<font color="blue">';
@@ -928,12 +907,12 @@ if($_SESSION["valid_login"] == TRUE)
 					}
 					else
 					{
-						if($sql_row["join_peer_list"] < 1000000000)
+						if($peer["join_peer_list"] < 1000000000)
 						{
 							// Modify join_peer_list field to be the join time + 1000000000
 							// so that it easy to keep the correct join time and also
 							// tag this peer as full for the peerlist
-							$joined = time() - ($sql_row["join_peer_list"] + 1000000000);
+							$joined = time() - ($peer["join_peer_list"] + 1000000000);
 							$joined = tk_time_convert($joined);
 
 							$permanent1 = '<font color="green">';
@@ -941,7 +920,7 @@ if($_SESSION["valid_login"] == TRUE)
 						}						
 						else
 						{
-							$joined = time() - $sql_row["join_peer_list"];
+							$joined = time() - $peer["join_peer_list"];
 							$joined = tk_time_convert($joined);
 
 							$permanent1 = NULL;
@@ -957,17 +936,17 @@ if($_SESSION["valid_login"] == TRUE)
 				}
 
 				// Check if peer is one of the generating currency peers
-				if(empty($sql_row["domain"]) == FALSE)
+				if(empty($peer["domain"]) == FALSE)
 				{
 					// Convert domain to IP
-					$peer_domain_to_IP = gethostbyname($sql_row["domain"]);
+					$peer_domain_to_IP = gethostbyname($peer["domain"]);
 				}
 				else
 				{
-					$peer_domain_to_IP = $sql_row["IP_Address"];
+					$peer_domain_to_IP = $peer["IP_Address"];
 				}
 				
-				$gen_peer_exist = mysql_result(mysql_query("SELECT IP_Address FROM `generating_peer_list` WHERE `IP_Address` = '$peer_domain_to_IP' LIMIT 1"),0,0);				
+				$gen_peer_exist = $g->get_generating_peer_by_ip($peer_domain_to_IP);
 
 				if(empty($gen_peer_exist) == FALSE)
 				{
@@ -980,25 +959,25 @@ if($_SESSION["valid_login"] == TRUE)
 					$gen_peer = NULL;
 				}
 
-				if($sql_row[$failed_column_name] == 65535)
+				if($peer[$failed_column_name] == 65535)
 				{
 					// First Contact Peer
 					$failure_score = "First<br>Contact";
 				}
-				else if($sql_row[$failed_column_name] == 65534)
+				else if($peer[$failed_column_name] == 65534)
 				{
 					// First Contact Peer
 					$failure_score = "Gateway";
 				}
 				else
 				{
-					$failure_score = $sql_row[$failed_column_name];
+					$failure_score = $peer[$failed_column_name];
 				}
 
 				$body_string .= '<tr>
-				 <td class="style2"><p style="word-wrap:break-word; ' . $gen_peer . 'font-size:11px;">' . $permanent1 . $sql_row["IP_Address"] . $sql_row["domain"] . $permanent2 . '</p></td>
-				 <td class="style2"><p style="word-wrap:break-word; font-size:11px;">' . $permanent1 . $sql_row["subfolder"] . $permanent2 . '</p></td>
-				 <td class="style2"><p style="word-wrap:break-word; font-size:11px;">' . $permanent1 . $sql_row["port_number"] . $permanent2 . '</p></td>
+				 <td class="style2"><p style="word-wrap:break-word; ' . $gen_peer . 'font-size:11px;">' . $permanent1 . $peer["IP_Address"] . $peer["domain"] . $permanent2 . '</p></td>
+				 <td class="style2"><p style="word-wrap:break-word; font-size:11px;">' . $permanent1 . $peer["subfolder"] . $permanent2 . '</p></td>
+				 <td class="style2"><p style="word-wrap:break-word; font-size:11px;">' . $permanent1 . $peer["port_number"] . $permanent2 . '</p></td>
 				 <td class="style2"><p style="word-wrap:break-word; font-size:11px;">' . $permanent1 . $last_heartbeat . $permanent2 . '</p></td>
 				 <td class="style2"><p style="word-wrap:break-word; font-size:11px;">' . $permanent1 . $joined . $permanent2 . '</p></td>
 				 <td class="style2"><p style="word-wrap:break-word; font-size:11px;">' . $permanent1 . $failure_score . $permanent2 . '</p></td>';
@@ -1010,12 +989,12 @@ if($_SESSION["valid_login"] == TRUE)
 				else
 				{
 					$body_string .= '<td><FORM ACTION="index.php?menu=peerlist&amp;remove=peer" METHOD="post"><input type="image" src="img/hr.gif" title="Delete Peer" name="remove' . $i . '" border="0">
-					 <input type="hidden" name="ip" value="' . $sql_row["IP_Address"] . '">
-					 <input type="hidden" name="domain" value="' . $sql_row["domain"] . '">
+					 <input type="hidden" name="ip" value="' . $peer["IP_Address"] . '">
+					 <input type="hidden" name="domain" value="' . $peer["domain"] . '">
 					 </FORM></td><td>
 					 <FORM ACTION="index.php?menu=peerlist&amp;edit=peer" METHOD="post"><input type="image" src="img/edit-icon.gif" title="Edit Peer" name="edit' . $i . '" border="0">
-					 <input type="hidden" name="ip" value="' . $sql_row["IP_Address"] . '">
-					 <input type="hidden" name="domain" value="' . $sql_row["domain"] . '">
+					 <input type="hidden" name="ip" value="' . $peer["IP_Address"] . '">
+					 <input type="hidden" name="domain" value="' . $peer["domain"] . '">
 					 </FORM>
 					 </td></tr>';
 				}
@@ -1031,18 +1010,17 @@ if($_SESSION["valid_login"] == TRUE)
 
 			
 			$sql = "SELECT * FROM `new_peers_list`";
-			$new_peers = mysql_num_rows(mysql_query($sql));
+			$new_peers = count($p->get_new_peers());
 
 			if($_GET["show"] == "reserve")
 			{
-				$sql = "SELECT * FROM `active_peer_list`";
-				$sql_num_results = mysql_num_rows(mysql_query($sql));
+                                $active_peers = count($p->get_active_peers());
 			}
 
 			$peer_transaction_start_blocks = $s->get_main_loop_status("peer_transaction_start_blocks"); 
 			$peer_transaction_performance = $s->get_main_loop_status("peer_transaction_performance"); 
 
-			$peer_number_bar = '<table border="0" cellspacing="0" cellpadding="0"><tr><td style="width:125px"><strong>Active Peers: <font color="green">' . $sql_num_results . '</font></strong></td>
+			$peer_number_bar = '<table border="0" cellspacing="0" cellpadding="0"><tr><td style="width:125px"><strong>Active Peers: <font color="green">' . $active_peers . '</font></strong></td>
 			<td style="width:175px"><strong>Peers in Reserve: <font color="blue">' . $new_peers . '</font></strong></td>
 			<td style="width:125px"><strong>Peer Speed: <font color="blue">' . $peer_transaction_start_blocks . '</font></strong></td>
 			<td style="width:190px"><strong>Group Response: <font color="blue">' . $peer_transaction_performance . ' sec</font></strong></td></tr><tr><td colspan="4"><hr></td></tr>
@@ -1712,7 +1690,7 @@ if($_SESSION["valid_login"] == TRUE)
 
 				home_screen("Database Update", $text_bar, $body_text , $quick_info);
 				exit;
-			}
+			} 
 			else
 			{
 				$text_bar = '<strong><font color="blue">Administrator Username & Password for Database Server Needed to Update</font></strong>';
@@ -1754,6 +1732,7 @@ if($_SESSION["valid_login"] == TRUE)
 	if($_GET["menu"] == "generation")
 	{
                 $s = new System();
+                $g = new Generation();
 		if($_GET["generate"] == "enable")
 		{
                         $s->set_option("generate_currency", "1");
@@ -1772,18 +1751,13 @@ if($_SESSION["valid_login"] == TRUE)
 			$IP_save = '<font color="blue"><strong>IP Update Successful</strong></font>';
 		}
 
-		$sql = "SELECT IP_Address FROM `generating_peer_list`";
-		$sql_result = mysql_query($sql);
-		$sql_num_results = mysql_num_rows($sql_result);
-
 		$ipv4_counter = 0;
 		$ipv6_counter = 0;
+                $gen_peers = $g->get_generating_peers_ordered_by_join_time();
 		// Count separate IPv4 & IPv6 Peers
-		for ($i = 0; $i < $sql_num_results; $i++)
+		foreach ($gen_peers as $peer)
 		{
-			$sql_row = mysql_fetch_array($sql_result);
-
-			if(ipv6_test($sql_row["IP_Address"]) == TRUE)
+			if(ipv6_test($peer["IP_Address"]) == TRUE)
 			{
 				$ipv6_counter++;
 			}
@@ -1793,18 +1767,13 @@ if($_SESSION["valid_login"] == TRUE)
 			}
 		}
 
-		$sql = "SELECT IP_Address FROM `generating_peer_queue`";
-		$sql_result = mysql_query($sql);
-		$sql_num_results = mysql_num_rows($sql_result);
-
 		$ipv4_counter_queue = 0;
 		$ipv6_counter_queue = 0;
+                $gen_queue = $g->get_generating_queue_ordered_by_timestamp();
 		// Count separate IPv4 & IPv6 Peers
-		for ($i = 0; $i < $sql_num_results; $i++)
+		foreach ($gen_queue as $peer)
 		{
-			$sql_row = mysql_fetch_array($sql_result);
-
-			if(ipv6_test($sql_row["IP_Address"]) == TRUE)
+			if(ipv6_test($peer["IP_Address"]) == TRUE)
 			{
 				$ipv6_counter_queue++;
 			}
@@ -1821,7 +1790,7 @@ if($_SESSION["valid_login"] == TRUE)
 			$my_public_key = my_public_key();
 			$join_peer_list_v4 = find_v4_gen_join($my_public_key);
 			$join_peer_list_v6 = find_v6_gen_join($my_public_key);
-			$last_generation = mysql_result(mysql_query("SELECT last_generation FROM `generating_peer_list` WHERE `public_key` = '$my_public_key' LIMIT 1"),0,0);
+			$last_generation = $g->get_generating_peer_by_key($my_public_key)["last_generation"];
 			$my_generation_IP = $s->get_option("generation_IP");
 			$my_generation_IP_v6 = $s->get_option("generation_IP_v6");
 			$production_time;
@@ -2050,25 +2019,21 @@ if($_SESSION["valid_login"] == TRUE)
 
 			$body_string = $body_string . '<hr><strong>Current Generation List</strong>
 				<div class="table"><table class="listing" border="0" cellspacing="0" cellpadding="0" ><tr><th>Public Key</th><th>Joined</th><th>Last Generated</th></tr>';
-
-			$sql = "SELECT * FROM `generating_peer_list` ORDER BY `join_peer_list` ASC";
-			$sql_result = mysql_query($sql);
-			$sql_num_results = mysql_num_rows($sql_result);
-
-			for ($i = 0; $i < $sql_num_results; $i++)
+                        
+                        $gen_peers = $g->get_generating_peers_ordered_by_join_time();
+			foreach ($gen_peers as $peer)
 			{
-				$sql_row = mysql_fetch_array($sql_result);
 
-				if($my_public_key == $sql_row["public_key"])
+				if($my_public_key == $peer["public_key"])
 				{
 					$public_key = '<p style="font-size:12px;"><font color="green"><strong>My Public Key</strong></font>';
 				}
 				else
 				{
-					$public_key = '<p style="word-wrap:break-word; width:325px; font-size:' . $default_public_key_font . 'px;">' . base64_encode($sql_row["public_key"]);
+					$public_key = '<p style="word-wrap:break-word; width:325px; font-size:' . $default_public_key_font . 'px;">' . base64_encode($peer["public_key"]);
 				}
 
-				if(ipv6_test($sql_row["IP_Address"]) == TRUE)
+				if(ipv6_test($peer["IP_Address"]) == TRUE)
 				{
 					//IPv6 Generating Peer
 					$ip_mode = '<font color="blue">IPv6<br></font>';
@@ -2081,8 +2046,8 @@ if($_SESSION["valid_login"] == TRUE)
 
 				$body_string .= '<tr>
 				<td class="style2">' . $public_key . '</p></td>
-				<td class="style2"><p style="font-size:10px;">' . $ip_mode . unix_timestamp_to_human($sql_row["join_peer_list"], $user_timezone) . '</p></td>
-				<td class="style2"><p style="font-size:10px;">' . tk_time_convert(time() - $sql_row["last_generation"]) . ' ago</p></td></tr>';
+				<td class="style2"><p style="font-size:10px;">' . $ip_mode . unix_timestamp_to_human($peer["join_peer_list"], $user_timezone) . '</p></td>
+				<td class="style2"><p style="font-size:10px;">' . tk_time_convert(time() - $peer["last_generation"]) . ' ago</p></td></tr>';
 			}
 
 			$body_string .= '</table></div>';
@@ -2097,24 +2062,20 @@ if($_SESSION["valid_login"] == TRUE)
 			$body_string .= '<hr><strong>Election Queue List</strong>
 				<div class="table"><table class="listing" border="0" cellspacing="0" cellpadding="0" ><tr><th>Public Key</th><th>Join Queue</th></tr>';
 
-			$sql = "SELECT * FROM `generating_peer_queue` ORDER BY `timestamp` ASC";
-			$sql_result = mysql_query($sql);
-			$sql_num_results = mysql_num_rows($sql_result);
-
-			for ($i = 0; $i < $sql_num_results; $i++)
+                        $gen_queue = $g->get_generating_queue_ordered_by_timestamp();
+			foreach ($gen_queue as $peer)
 			{
-				$sql_row = mysql_fetch_array($sql_result);
 
-				if($my_public_key == $sql_row["public_key"])
+				if($my_public_key == $peer["public_key"])
 				{
 					$public_key = '<p style="font-size:12px;"><font color="green"><strong>My Public Key</strong></font>';
 				}
 				else
 				{
-					$public_key = '<p style="word-wrap:break-word; width:425px; font-size:' . $default_public_key_font . 'px;">' . base64_encode($sql_row["public_key"]);
+					$public_key = '<p style="word-wrap:break-word; width:425px; font-size:' . $default_public_key_font . 'px;">' . base64_encode($peer["public_key"]);
 				}
 
-				if(ipv6_test($sql_row["IP_Address"]) == TRUE)
+				if(ipv6_test($peer["IP_Address"]) == TRUE)
 				{
 					//IPv6 Generating Peer
 					$ip_mode = '<font color="blue">IPv6<br></font>';
@@ -2127,7 +2088,7 @@ if($_SESSION["valid_login"] == TRUE)
 
 				$body_string .= '<tr>
 				<td class="style2">' . $public_key . '</p></td>
-				<td class="style2"><p style="font-size:10px;">' . $ip_mode . tk_time_convert(time() - $sql_row["timestamp"]) . ' ago</p></td></tr>';
+				<td class="style2"><p style="font-size:10px;">' . $ip_mode . tk_time_convert(time() - $peer["timestamp"]) . ' ago</p></td></tr>';
 			}
 
 			$body_string .= '</table></div>';
@@ -2148,7 +2109,7 @@ if($_SESSION["valid_login"] == TRUE)
 		}
 
 		// Total Servers that have been Generating for at least 24 hours previous, excluding those that have just joined recently
-		$gen_peers_total = mysql_result(mysql_query("SELECT COUNT(*) FROM `generating_peer_list` WHERE `join_peer_list` < " . (time() - 86400) . ""),0);
+		$gen_peers_total = count($g->get_generating_peers_at_least_24_hours());
 
 		for ($i = 0; $i < $max_cycles_ahead; $i++)
 		{
@@ -2283,7 +2244,7 @@ if($_SESSION["valid_login"] == TRUE)
 			$max_cycles_ahead = 576;
 			$total_ipv6_elections = 0;
 			// Total Servers that have been Generating for at least 24 hours previous, excluding those that have just joined recently
-			$gen_peers_total = mysql_result(mysql_query("SELECT COUNT(*) FROM `generating_peer_list` WHERE `join_peer_list` < " . (time() - 86400) . ""),0);
+			$gen_peers_total = count($g->get_generating_peers_at_least_24_hours());
 
 			for ($i = 1; $i < $max_cycles_ahead; $i++)// IPv4 Elections
 			{
